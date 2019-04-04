@@ -1,0 +1,8 @@
+﻿add_executable(static_enum_example)
+target_sources(static_enum_example PRIVATE example.cpp)
+target_link_libraries(static_enum_example PRIVATE static_enum)
+if(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
+    target_compile_options(static_enum_example PRIVATE /W4 /permissive-)
+elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(static_enum_example PRIVATE -Wall -Wextra -pedantic-errors)
+endif()
