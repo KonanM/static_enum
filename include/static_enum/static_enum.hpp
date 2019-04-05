@@ -54,7 +54,10 @@ namespace static_enum
 #define STATIC_ENUM_FUNCSIG
 		// Unsupported compiler.
 #endif
-
+		[[nodiscard]] constexpr bool is_digit(char c) noexcept
+		{
+			return c >= '0' && c <= '9';
+		}
 		//this is the most simple version of the hack that we're gonna use
 		//we use either __PRETTY_FUNCTION__ or __FUNCSIG__ to analyze the function signature
 		//if the enum value doesn't exist it will appear as starting with "0x"
@@ -65,7 +68,7 @@ namespace static_enum
 		[[nodiscard]] constexpr bool is_valid_enum_impl() noexcept
 		{
 			constexpr std::string_view name{ STATIC_ENUM_FUNCSIG };
-			return name[name.find_last_of(", :", name.size() - suffix) + 1] != '0';
+			return !is_digit(name[name.find_last_of(", :)-", name.size() - suffix) + 1]);
 		}
 
 		//for the string conversion we simply have to extract the correct substring from the function signature
@@ -73,15 +76,13 @@ namespace static_enum
 		[[nodiscard]] constexpr std::optional<std::string_view> to_string_impl_static() noexcept
 		{
 			constexpr std::string_view name{ STATIC_ENUM_FUNCSIG };
-			constexpr std::size_t prefix = name.find_last_of(", :", name.size() - suffix) + 1;
+			constexpr std::size_t prefix = name.find_last_of(", :)-", name.size() - suffix) + 1;
 
-			if constexpr (name[prefix] != '0')
+			if constexpr (!is_digit(name[prefix]))
 				return name.substr(prefix, name.size() - suffix - prefix);
 			else
 				return std::nullopt;
 		}
-
-#undef STATIC_ENUM_FUNCSIG
 
 		template <typename E, int Offset, int ...I>
 		[[nodiscard]] constexpr std::optional<E> enum_from_string_impl(std::string_view name, std::integer_sequence<int, I...>) noexcept
@@ -97,29 +98,24 @@ namespace static_enum
 			//we have to convert the runtime value to a compile time index
 			//this method uses an O(1) lookup via function pointers
 			using ToStringFunctionDecl = decltype(&to_string_impl_static<E, static_cast<E>(0)>);
-			static constexpr std::array<ToStringFunctionDecl, sizeof...(I)> to_string_functions{ { to_string_impl_static<E, static_cast<E>(I - Offset)>... } };
-			return to_string_functions[ Offset + static_cast<int>(value)]();
+			constexpr std::array<ToStringFunctionDecl, sizeof...(I)> to_string_functions{ { to_string_impl_static<E, static_cast<E>(I - Offset)>... } };
+			return to_string_functions[Offset + static_cast<int>(value)]();
 		}
 
 		template <typename E, int Offset, int ...I>
 		[[nodiscard]] constexpr decltype(auto) get_enumerators_impl(std::integer_sequence<int, I...>) noexcept
 		{
-			static constexpr size_t N = sizeof...(I);
+			constexpr size_t N = sizeof...(I);
 			//here we create an array of bool where each index indicates whether it belongs to a valid enum entry
-			static constexpr std::array<bool, N> validIndices{ {is_valid_enum_impl<E, static_cast<E>(I - Offset)>()...} };
+			constexpr std::array<bool, N> validIndices{ {is_valid_enum_impl<E, static_cast<E>(I - Offset)>()...} };
 			//here we count the number of valid enum indices
-			static constexpr size_t numValid = ((validIndices[I] ? 1 : 0) + ...);
+			constexpr size_t numValid = ((validIndices[I] ? 1 : 0) + ...);
 			//with this information we can build an array of only valid enum entries
-			static constexpr std::array<E, numValid> enumArray = []()
-			{
-				//is there a more elegant way to do this?
-				std::array<E, numValid> tmpArray{};
-				size_t enumIdx = 0;
-				for (size_t i = 0; i < N && enumIdx < numValid; ++i)
-					if (validIndices[i])
-						tmpArray[enumIdx++] = static_cast<E>(i - Offset);
-				return tmpArray;
-			}();
+			std::array<E, numValid> enumArray{};
+			size_t enumIdx = 0;
+			for (size_t i = 0; i < N && enumIdx < numValid; ++i)
+				if (validIndices[i])
+					enumArray[enumIdx++] = static_cast<E>(i - Offset);
 
 			return enumArray;
 		}
@@ -150,7 +146,7 @@ namespace static_enum
 		static_assert(std::is_enum_v<std::decay_t<E>>, "static_enum::to_string requires enum type.");
 		if (static_cast<int>(value) >= STATIC_ENUM_RANGE || static_cast<int>(value) <= -STATIC_ENUM_RANGE)
 		{
-			return std::nullopt; // Enum variable out of STATIC_ENUM_RANGE.
+			return std::nullopt; // Enum variable out of MAGIC_ENUM_RANGE.
 		}
 		return detail::to_string_impl<std::decay_t<E>, detail::Limit<U>::Offset>(value, Indices{});
 	}
