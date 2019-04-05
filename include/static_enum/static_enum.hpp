@@ -28,133 +28,136 @@
 #include <limits>
 #include <string_view>
 #include <optional>
+#include <array>
 
-// Enum variable must be in range (-MAGIC_ENUM_RANGE, MAGIC_ENUM_RANGE). If you need a larger range, redefine the macro MAGIC_ENUM_RANGE.
-#if !defined(MAGIC_ENUM_RANGE)
-#  define MAGIC_ENUM_RANGE 300000
+// Enum variable must be in range (-STATIC_ENUM_RANGE / 2, STATIC_ENUM_RANGE). If you need a larger range, redefine the macro MAGIC_ENUM_RANGE.
+#if !defined(STATIC_ENUM_RANGE)
+#  define MAGIC_ENUM_RANGE 256
 #endif
 
-namespace magic_enum 
+namespace static_enum
 {
-static_assert(MAGIC_ENUM_RANGE > 0,
-              "MAGIC_ENUM_RANGE must be positive and greater than zero.");
-static_assert(MAGIC_ENUM_RANGE % 8 == 0,
-              "MAGIC_ENUM_RANGE must be a multiple of 8.");
-static_assert(MAGIC_ENUM_RANGE < std::numeric_limits<int>::max(),
-              "MAGIC_ENUM_RANGE must be less INT_MAX.");
+	static_assert(STATIC_ENUM_RANGE > 0,
+		"STATIC_ENUM_RANGE must be positive and greater than zero.");
+	static_assert(STATIC_ENUM_RANGE < std::numeric_limits<int>::max(),
+		"STATIC_ENUM_RANGE must be less INT_MAX.");
 
-namespace detail 
-{
-
-template <typename E, E V>
-[[nodiscard]] constexpr std::optional<std::string_view> enum_to_string_impl() noexcept 
-{
-	static_assert(std::is_enum_v<E>, "magic_enum::enum_to_string require enum type.");
-#if defined(__clang__) || (defined(__GNUC__) && __GNUC__ >= 9)
-	std::string_view name{ __PRETTY_FUNCTION__ };
-	constexpr auto suffix = sizeof("]") - 1;
-#elif defined(_MSC_VER)
-	std::string_view name{ __FUNCSIG__ };
-	constexpr auto suffix = sizeof(">(void) noexcept") - 1;
-#else
-	return std::nullopt; // Unsupported compiler.
-#endif
-
-	std::size_t prefix = name.find_last_of(", :", name.size() - suffix) + 1;
-
-	if (name[prefix] != '0') {
-		return name.substr(prefix , name.size() - suffix - prefix);
-	}
-	else {
-		return std::nullopt; // Enum variable does not have name.
-	}
-}
-
-template <typename E, int V>
-struct enum_from_string_impl_t final 
-{
-  [[nodiscard]] constexpr std::optional<E> operator()(std::string_view name) const noexcept {
-    if constexpr (V > std::numeric_limits<std::underlying_type_t<E>>::max()) {
-      return std::nullopt; // Enum variable out of range.
-    }
-
-    if (enum_to_string_impl<E, static_cast<E>(V)>() == name) {
-      return static_cast<E>(V);
-    } else if (enum_to_string_impl<E, static_cast<E>(V + 1)>() == name) {
-      return static_cast<E>(V + 1);
-    } else if (enum_to_string_impl<E, static_cast<E>(V + 2)>() == name) {
-      return static_cast<E>(V + 2);
-    } else if (enum_to_string_impl<E, static_cast<E>(V + 3)>() == name) {
-      return static_cast<E>(V + 3);
-    } else if (enum_to_string_impl<E, static_cast<E>(V + 4)>() == name) {
-      return static_cast<E>(V + 4);
-    } else if (enum_to_string_impl<E, static_cast<E>(V + 5)>() == name) {
-      return static_cast<E>(V + 5);
-    } else if (enum_to_string_impl<E, static_cast<E>(V + 6)>() == name) {
-      return static_cast<E>(V + 6);
-    } else if (enum_to_string_impl<E, static_cast<E>(V + 7)>() == name) {
-      return static_cast<E>(V + 7);
-    } else {
-      return enum_from_string_impl_t<E, V + 8>{}(name);
-    }
-  }
-};
-
-template <typename E, typename U, U ...I>
-[[nodiscard]] constexpr std::optional<E> enum_from_string_impl(std::string_view name, std::integer_sequence<U, I...>) noexcept
-{
-	std::optional<E> returnValue;
-	(((returnValue = (enum_to_string_impl<E, static_cast<E>(I - MAGIC_ENUM_RANGE)>() == name) ? std::optional<E>(static_cast<E>(I - MAGIC_ENUM_RANGE)) : std::nullopt), returnValue) || ...);
-
-	return returnValue;
-};
-
-template <typename E>
-struct enum_from_string_impl_t<E, MAGIC_ENUM_RANGE> final 
-{
-  [[nodiscard]] constexpr std::optional<E> operator()(std::string_view) const noexcept 
-  {
-    static_assert(std::is_enum_v<E>, "magic_enum::enum_from_string require enum type.");
-    return std::nullopt; // Enum variable out of range MAGIC_ENUM_RANGE.
-  }
-};
-
-template <typename E, typename U, U ...I>
-[[nodiscard]] constexpr std::optional<std::string_view> enum_to_string_impl(E value, std::integer_sequence<U, I...>) noexcept
-{
-	std::optional<std::string_view> returnValue;
-	bool isValid = false;
-	((((isValid = (value == static_cast<E>(I - MAGIC_ENUM_RANGE)))), (returnValue = isValid ? enum_to_string_impl<E, static_cast<E>(I - MAGIC_ENUM_RANGE)>() : std::nullopt), isValid) || ...);
-	 
-	return returnValue;
-};
-
-} // namespace detail
-
-// enum_to_string(enum) obtains string enum name from enum variable.
-template <typename E, typename U = std::underlying_type_t<std::decay_t<E>>, typename Indices = std::make_integer_sequence<U, std::is_signed_v<U> ?  2 * MAGIC_ENUM_RANGE - 1 : MAGIC_ENUM_RANGE>>
-[[nodiscard]] constexpr std::optional<std::string_view> enum_to_string(E value) noexcept 
-{
-	//static_cast(!std::is_enum_v<std::decay_t<E>>, "Parameter has to be an enum.");
-	if (static_cast<int>(value) >= MAGIC_ENUM_RANGE || static_cast<int>(value) <= -MAGIC_ENUM_RANGE)
+	namespace detail
 	{
-		return std::nullopt; // Enum variable out of range MAGIC_ENUM_RANGE.
+#if defined(__clang__) || (defined(__GNUC__) && __GNUC__ >= 9)
+		constexpr auto suffix = sizeof("]") - 1;
+#define STATIC_ENUM_FUNCSIG __PRETTY_FUNCTION__
+#elif defined(_MSC_VER)
+		constexpr auto suffix = sizeof(">(void) noexcept") - 1;
+#define STATIC_ENUM_FUNCSIG __FUNCSIG__
+#else
+#define STATIC_ENUM_FUNCSIG
+		// Unsupported compiler.
+#endif
+
+		//this is the most simple version of the hack that we're gonna use
+		//we use either __PRETTY_FUNCTION__ or __FUNCSIG__ to analyze the function signature
+		//if the enum value doesn't exist it will appear as starting with "0x"
+		//otherwise it will have the correct enum name for the value V
+		//to check whether the enum is valid it's enough to check simply if the first letter of the enum is a 0
+		//this works with MSVC, gcc and clang
+		template <typename E, E V>
+		[[nodiscard]] constexpr bool is_valid_enum_impl() noexcept
+		{
+			constexpr std::string_view name{ STATIC_ENUM_FUNCSIG };
+			return name[name.find_last_of(", :", name.size() - suffix) + 1] != '0';
+		}
+
+		//for the string conversion we simply have to extract the correct substring from the function signature
+		template <typename E, E V>
+		[[nodiscard]] constexpr std::optional<std::string_view> enum_to_string_impl() noexcept
+		{
+			constexpr std::string_view name{ STATIC_ENUM_FUNCSIG };
+			constexpr std::size_t prefix = name.find_last_of(", :", name.size() - suffix) + 1;
+
+			if constexpr (name[prefix] != '0')
+				return name.substr(prefix, name.size() - suffix - prefix);
+			else
+				return std::nullopt;
+		}
+
+#undef STATIC_ENUM_FUNCSIG
+
+		template <typename E, int Offset, int ...I>
+		[[nodiscard]] constexpr std::optional<E> enum_from_string_impl(std::string_view name, std::integer_sequence<int, I...>) noexcept
+		{
+			std::optional<E> returnValue;
+			(((enum_to_string_impl<E, static_cast<E>(I - Offset)>() == name) ? (returnValue = static_cast<E>(I - Offset), false) : true) && ...);
+			return returnValue;
+		}
+
+		template <typename E, int Offset, int ...I>
+		[[nodiscard]] constexpr std::optional<std::string_view> enum_to_string_impl(E value, std::integer_sequence<int, I...>) noexcept
+		{
+			std::optional<std::string_view> returnValue;
+			(((value == static_cast<E>(I - Offset)) ? (returnValue = enum_to_string_impl<E, static_cast<E>(I - Offset)>(), false) : true) && ...);
+			return returnValue;
+		}
+
+		template <typename E, int Offset, int ...I>
+		[[nodiscard]] constexpr decltype(auto) make_enum_range_impl(std::integer_sequence<int, I...>) noexcept
+		{
+			constexpr size_t N = sizeof...(I);
+			//here we create an array of bool where each index indicates whether it belongs to a valid enum entry
+			constexpr std::array<bool, N> validIndices{ {is_valid_enum_impl<E, static_cast<E>(I - Offset)>()...} };
+			//here we count the number of valid enum indices
+			constexpr size_t numValid = ((validIndices[I] ? 1 : 0) + ...);
+			//with this information we can build an array of only valid enum entries
+			std::array<E, numValid> enumArray{};
+			size_t enumIdx = 0;
+			for (size_t i = 0; i < N && enumIdx < numValid; ++i)
+				if (validIndices[i])
+					enumArray[enumIdx++] = static_cast<E>(i - Offset);
+
+			return enumArray;
+		}
+		//for small like like char we should check for the right range - we should not stress the compiler more than necessary
+		template <typename U>
+		static constexpr int Size = std::numeric_limits<U>::max() < std::numeric_limits<int>::max() 
+			? std::min((int) std::numeric_limits<U>::max() - (int)std::numeric_limits<U>::min() + 1, STATIC_ENUM_RANGE) 
+			: STATIC_ENUM_RANGE;
+		template <typename U>
+		static constexpr int Offset = std::is_signed_v<U> ? (detail::Size<U> / 2) : 0;
+	} // namespace detail
+
+	// enum_to_string(enum) obtains string enum name from enum variable.
+	template <typename E, typename U = std::underlying_type_t<std::decay_t<E>>, typename Indices = std::make_integer_sequence<int, detail::Size<U>>>
+	[[nodiscard]] constexpr std::optional<std::string_view> enum_to_string(E value) noexcept
+	{
+		static_assert(std::is_enum_v<std::decay_t<E>>, "static_enum::enum_to_string requires enum type.");
+		if (static_cast<int>(value) >= STATIC_ENUM_RANGE || static_cast<int>(value) <= -STATIC_ENUM_RANGE)
+		{
+			return std::nullopt; // Enum variable out of range MAGIC_ENUM_RANGE.
+		}
+		return detail::enum_to_string_impl<std::decay_t<E>, detail::Offset<U>>(value, Indices{});
 	}
-	return detail::enum_to_string_impl<std::decay_t<E>, U>(value, Indices{});
-}
 
-// enum_to_string<enum>() obtains string enum name from static storage enum variable.
-template <auto V, typename = std::enable_if_t<std::is_enum_v<std::decay_t<decltype(V)>>>>
-[[nodiscard]] constexpr std::optional<std::string_view> enum_to_string() noexcept 
-{
-  return detail::enum_to_string_impl<decltype(V), V>();
-}
+	// enum_to_string<enum>() obtains string enum name from static storage enum variable.
+	template <auto V>
+	[[nodiscard]] constexpr std::optional<std::string_view> enum_to_string() noexcept
+	{
+		static_assert(std::is_enum_v<std::decay_t<decltype(V)>>, "static_enum::enum_to_string requires an enum type.");
+		return detail::enum_to_string_impl<decltype(V), V>();
+	}
 
-// enum_from_string(name) obtains enum variable from enum string name.
-template <typename E , typename U = std::underlying_type_t<std::decay_t<E>>, typename Indices = std::make_integer_sequence<U, std::is_signed_v<U> ? 2 * MAGIC_ENUM_RANGE - 1 : MAGIC_ENUM_RANGE>>
-[[nodiscard]] constexpr std::optional<E> enum_from_string(std::string_view name) noexcept 
-{
-	return detail::enum_from_string_impl<E, U>(name, Indices{});
-}
+	template <typename E, typename U = std::underlying_type_t<std::decay_t<E>>, typename Indices = std::make_integer_sequence<int, detail::Size<U>>>
+	[[nodiscard]] constexpr decltype(auto) make_enum_range()
+	{
+		static_assert(std::is_enum_v<std::decay_t<E>>, "static_enum::enum_to_string requires an enum type.");
+		return detail::make_enum_range_impl<E, detail::Offset<U>>(Indices{});
+	}
 
-} // namespace magic_enum
+	// enum_from_string(name) obtains the enum variable from a string
+	template <typename E, typename U = std::underlying_type_t<std::decay_t<E>>, typename Indices = std::make_integer_sequence<int, detail::Size<U>>>
+	[[nodiscard]] constexpr std::optional<E> enum_from_string(std::string_view name) noexcept
+	{
+		static_assert(std::is_enum_v<std::decay_t<E>>, "static_enum::enum_to_string requires an enum type.");
+		return detail::enum_from_string_impl<E, detail::Offset<U>>(name, Indices{});
+	}
+
+} // namespace static_enum
