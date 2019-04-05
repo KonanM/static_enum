@@ -34,8 +34,16 @@ enum class Numbers : unsigned char { one = 10, two = 20, three = 30 };
 
 enum class Color : int { GREEN = 7, RED = -12, BLUE = 15 };
 
+enum class Alphabet : size_t { a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z };
+
 TEST(static_enum, enum_range_constexpr)
 {
+	constexpr auto enumRangeAlphabet = static_enum::get_enumerators<Alphabet>();
+	static_assert(enumRangeAlphabet.size() == 26);
+
+	for (size_t i = 0; i < 26; ++i)
+		ASSERT_EQ(static_enum::to_string(enumRangeAlphabet[i]).value().front(), ('a' + i));
+	
 	constexpr auto enumRangeColor = static_enum::get_enumerators<Color>();
 	static_assert(enumRangeColor.size() == 3);
 	static_assert(enumRangeColor[0] == Color::RED, "Color must match");

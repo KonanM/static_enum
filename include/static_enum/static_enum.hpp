@@ -70,7 +70,7 @@ namespace static_enum
 
 		//for the string conversion we simply have to extract the correct substring from the function signature
 		template <typename E, E V>
-		[[nodiscard]] constexpr std::optional<std::string_view> to_string_impl() noexcept
+		[[nodiscard]] constexpr std::optional<std::string_view> to_string_impl_static() noexcept
 		{
 			constexpr std::string_view name{ STATIC_ENUM_FUNCSIG };
 			constexpr std::size_t prefix = name.find_last_of(", :", name.size() - suffix) + 1;
@@ -87,32 +87,39 @@ namespace static_enum
 		[[nodiscard]] constexpr std::optional<E> enum_from_string_impl(std::string_view name, std::integer_sequence<int, I...>) noexcept
 		{
 			std::optional<E> returnValue;
-			(((to_string_impl<E, static_cast<E>(I - Offset)>() == name) ? (returnValue = static_cast<E>(I - Offset), false) : true) && ...);
+			(((to_string_impl_static<E, static_cast<E>(I - Offset)>() == name) ? (returnValue = static_cast<E>(I - Offset), false) : true) && ...);
 			return returnValue;
 		}
 
 		template <typename E, int Offset, int ...I>
 		[[nodiscard]] constexpr std::optional<std::string_view> to_string_impl(E value, std::integer_sequence<int, I...>) noexcept
 		{
-			std::optional<std::string_view> returnValue;
-			(((value == static_cast<E>(I - Offset)) ? (returnValue = to_string_impl<E, static_cast<E>(I - Offset)>(), false) : true) && ...);
-			return returnValue;
+			//we have to convert the runtime value to a compile time index
+			//this method uses an O(1) lookup via function pointers
+			using ToStringFunctionDecl = decltype(&to_string_impl_static<E, static_cast<E>(0)>);
+			static constexpr std::array<ToStringFunctionDecl, sizeof...(I)> to_string_functions{ { to_string_impl_static<E, static_cast<E>(I - Offset)>... } };
+			return to_string_functions[ Offset + static_cast<int>(value)]();
 		}
 
 		template <typename E, int Offset, int ...I>
 		[[nodiscard]] constexpr decltype(auto) get_enumerators_impl(std::integer_sequence<int, I...>) noexcept
 		{
-			constexpr size_t N = sizeof...(I);
+			static constexpr size_t N = sizeof...(I);
 			//here we create an array of bool where each index indicates whether it belongs to a valid enum entry
-			constexpr std::array<bool, N> validIndices{ {is_valid_enum_impl<E, static_cast<E>(I - Offset)>()...} };
+			static constexpr std::array<bool, N> validIndices{ {is_valid_enum_impl<E, static_cast<E>(I - Offset)>()...} };
 			//here we count the number of valid enum indices
-			constexpr size_t numValid = ((validIndices[I] ? 1 : 0) + ...);
+			static constexpr size_t numValid = ((validIndices[I] ? 1 : 0) + ...);
 			//with this information we can build an array of only valid enum entries
-			std::array<E, numValid> enumArray{};
-			size_t enumIdx = 0;
-			for (size_t i = 0; i < N && enumIdx < numValid; ++i)
-				if (validIndices[i])
-					enumArray[enumIdx++] = static_cast<E>(i - Offset);
+			static constexpr std::array<E, numValid> enumArray = []()
+			{
+				//is there a more elegant way to do this?
+				std::array<E, numValid> tmpArray{};
+				size_t enumIdx = 0;
+				for (size_t i = 0; i < N && enumIdx < numValid; ++i)
+					if (validIndices[i])
+						tmpArray[enumIdx++] = static_cast<E>(i - Offset);
+				return tmpArray;
+			}();
 
 			return enumArray;
 		}
@@ -143,7 +150,7 @@ namespace static_enum
 		static_assert(std::is_enum_v<std::decay_t<E>>, "static_enum::to_string requires enum type.");
 		if (static_cast<int>(value) >= STATIC_ENUM_RANGE || static_cast<int>(value) <= -STATIC_ENUM_RANGE)
 		{
-			return std::nullopt; // Enum variable out of MAGIC_ENUM_RANGE.
+			return std::nullopt; // Enum variable out of STATIC_ENUM_RANGE.
 		}
 		return detail::to_string_impl<std::decay_t<E>, detail::Limit<U>::Offset>(value, Indices{});
 	}
@@ -154,7 +161,7 @@ namespace static_enum
 	[[nodiscard]] constexpr std::optional<std::string_view> to_string() noexcept
 	{
 		static_assert(std::is_enum_v<std::decay_t<decltype(V)>>, "static_enum::to_string requires an enum type.");
-		return detail::to_string_impl<decltype(V), V>();
+		return detail::to_string_impl_static<decltype(V), V>();
 	}
 
 	//from_string(name): get the enum variable from a string, returns a constexpr std::optional<Enum>
