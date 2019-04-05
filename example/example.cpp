@@ -1,3 +1,4 @@
+
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2019 Kinan Mahdi
@@ -20,5 +21,18 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE  OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 //
+#include <static_enum/static_enum.hpp>
+#include <iostream>
 
-int main() {}
+enum class Color : int { GREEN = 7, RED = -12, BLUE = 15 };
+
+int main() 
+{
+	
+
+	constexpr auto colorEnumerators = static_enum::get_enumerators<Color>();
+	static_assert(colorEnumerators.size() == 3);
+
+	for (auto e : colorEnumerators)
+		std::cout << static_enum::to_string(e).value() << ": " << static_cast<int>(e) << "\n";
+}
