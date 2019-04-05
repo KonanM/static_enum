@@ -30,9 +30,11 @@
 #include <optional>
 #include <array>
 
-// Enum variable must be in range (-STATIC_ENUM_RANGE / 2, STATIC_ENUM_RANGE). If you need a larger range, redefine the macro MAGIC_ENUM_RANGE.
+// Enum variable must be in range (-STATIC_ENUM_RANGE / 2, STATIC_ENUM_RANGE /2) for signed types
+// Enum variable must be in range (0, STATIC_ENUM_RANGE) for unsigned types
+// If you need a larger range, redefine the macro STATIC_ENUM_RANGE.
 #if !defined(STATIC_ENUM_RANGE)
-#  define MAGIC_ENUM_RANGE 256
+#  define STATIC_ENUM_RANGE 256
 #endif
 
 namespace static_enum
@@ -116,17 +118,27 @@ namespace static_enum
 
 			return enumArray;
 		}
-		//for small like like char we should check for the right range - we should not stress the compiler more than necessary
+
+		//for small values like char we should check for the right range - we should not stress the compiler more than necessary
 		template <typename U>
-		static constexpr int Size = std::numeric_limits<U>::max() < std::numeric_limits<int>::max() 
-			? std::min((int) std::numeric_limits<U>::max() - (int)std::numeric_limits<U>::min() + 1, STATIC_ENUM_RANGE) 
-			: STATIC_ENUM_RANGE;
-		template <typename U>
-		static constexpr int Offset = std::is_signed_v<U> ? (detail::Size<U> / 2) : 0;
+		struct Limit final
+		{
+			static constexpr int Range = sizeof(U) <= 2 ? (int)std::numeric_limits<U>::max() - (int)std::numeric_limits<U>::min() + 1 : std::numeric_limits<int>::max();
+			static constexpr int Size = std::min(Range, STATIC_ENUM_RANGE);
+			static constexpr int Offset = std::is_signed_v<U> ? (Size + 1) / 2 : 0;
+		};
+
 	} // namespace detail
 
+	template <typename E, typename U = std::underlying_type_t<std::decay_t<E>>, typename Indices = std::make_integer_sequence<int, detail::Limit<U>::Size>>
+	[[nodiscard]] constexpr decltype(auto) make_enum_range() noexcept
+	{
+		static_assert(std::is_enum_v<std::decay_t<E>>, "static_enum::enum_to_string requires an enum type.");
+		return detail::make_enum_range_impl<E, detail::Limit<U>::Offset>(Indices{});
+	}
+
 	// enum_to_string(enum) obtains string enum name from enum variable.
-	template <typename E, typename U = std::underlying_type_t<std::decay_t<E>>, typename Indices = std::make_integer_sequence<int, detail::Size<U>>>
+	template <typename E, typename U = std::underlying_type_t<std::decay_t<E>>, typename Indices = std::make_integer_sequence<int, detail::Limit<U>::Size>>
 	[[nodiscard]] constexpr std::optional<std::string_view> enum_to_string(E value) noexcept
 	{
 		static_assert(std::is_enum_v<std::decay_t<E>>, "static_enum::enum_to_string requires enum type.");
@@ -134,10 +146,11 @@ namespace static_enum
 		{
 			return std::nullopt; // Enum variable out of range MAGIC_ENUM_RANGE.
 		}
-		return detail::enum_to_string_impl<std::decay_t<E>, detail::Offset<U>>(value, Indices{});
+		return detail::enum_to_string_impl<std::decay_t<E>, detail::Limit<U>::Offset>(value, Indices{});
 	}
 
-	// enum_to_string<enum>() obtains string enum name from static storage enum variable.
+	// enum_to_string<enum>() is the most straightforward conversion to strings
+	//prefer this over the enum_to_string() version if possible
 	template <auto V>
 	[[nodiscard]] constexpr std::optional<std::string_view> enum_to_string() noexcept
 	{
@@ -145,19 +158,11 @@ namespace static_enum
 		return detail::enum_to_string_impl<decltype(V), V>();
 	}
 
-	template <typename E, typename U = std::underlying_type_t<std::decay_t<E>>, typename Indices = std::make_integer_sequence<int, detail::Size<U>>>
-	[[nodiscard]] constexpr decltype(auto) make_enum_range()
-	{
-		static_assert(std::is_enum_v<std::decay_t<E>>, "static_enum::enum_to_string requires an enum type.");
-		return detail::make_enum_range_impl<E, detail::Offset<U>>(Indices{});
-	}
-
 	// enum_from_string(name) obtains the enum variable from a string
-	template <typename E, typename U = std::underlying_type_t<std::decay_t<E>>, typename Indices = std::make_integer_sequence<int, detail::Size<U>>>
+	template <typename E, typename U = std::underlying_type_t<std::decay_t<E>>, typename Indices = std::make_integer_sequence<int, detail::Limit<U>::Size>>
 	[[nodiscard]] constexpr std::optional<E> enum_from_string(std::string_view name) noexcept
 	{
 		static_assert(std::is_enum_v<std::decay_t<E>>, "static_enum::enum_to_string requires an enum type.");
-		return detail::enum_from_string_impl<E, detail::Offset<U>>(name, Indices{});
+		return detail::enum_from_string_impl<E, detail::Limit<U>::Offset>(name, Indices{});
 	}
-
 } // namespace static_enum
