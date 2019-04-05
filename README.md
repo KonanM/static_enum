@@ -9,8 +9,8 @@ Static Enum is a single header C++17 library which provides compile time enumume
 * `static_enum::get_enumerators` creates a `std::array<Enum,N>` with all enumeration values (sorted by value)
 
 ## Where is the drawback?
-Static Enum uses compiler intrinsics - namely `__PRETTY_FUNCTION__` and `__FUNCSIG__` to check whether an enumeration value is valid and make the string conversions. I have  taken this trick from https://github.com/Neargye/magic_enum and adapted it slightly.
-The main drawback is that this library works by checking all the possible values. The default limit is currently 256 values, which only works for arbitrary enums where the size of the underlying type is smaller than 2 bytes.
+Static Enum uses compiler intrinsics - namely `__PRETTY_FUNCTION__` and `__FUNCSIG__` to check whether an enumeration value is valid and make the string conversions. I have  taken this trick from https://github.com/Neargye/magic_enum and adapted it slightly.  
+The main drawback is that this library creates the enumerators by checking all the possible values. The default limit is to check for 256 values, which only works for arbitrary enums where the size of the underlying type is smaller than 2 bytes.
 It also works for enums of bigger types, but the enumeration values have to be in the range of [-127, 128] for signed types and [0, 255] for unsigned types.
 
 
@@ -34,10 +34,10 @@ for(auto e : colorEnumerators)
 	std::cout << static_enum::to_string(e) << ": " << static_cast<int>(e) << "\n";
 
 ```
-This will print:
-RED: -12
-GREEN: 7
-BLUE: 15
+This will print:  
+RED: -12  
+GREEN: 7  
+BLUE: 15  
 ## Compiler compatibility
 
 * Clang/LLVM >= 5
