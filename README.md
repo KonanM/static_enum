@@ -26,13 +26,17 @@ It also works for enums of bigger types, but the enumeration values have to be i
 
 ```Cpp
 enum class Color : int { GREEN = 7, RED = -12, BLUE = 15 };
-
+// the deduced type is std::array<Color, 3>, it will update as you update the enum
 constexpr auto colorEnumerators = static_enum::get_enumerators<Color>();
-static_assert(colorEnumerators.size() == 3);
-
-for(auto e : colorEnumerators)
-	std::cout << static_enum::to_string(e) << ": " << static_cast<int>(e) << "\n";
-
+//check the size of the array to get the number of different values
+static_assert(colorEnumerators.size() == 3); 
+//you can also convert from names
+constexpr std::array<std::string_view, 3> colorEnumeratorNames = {"RED", "GREEN", "BLUE"};
+std::array<Color, 3> colorsFromNames;
+std::transform(colorEnumeratorNames.begin(), colorEnumeratorNames.end(), colorsFromNames.begin(), [](auto& val) { return *static_enum::from_string<Color>(val); });
+//or convert an enum to a name
+for (Color e : colorEnumerators)
+	std::cout << static_enum::to_string(e).value() << ": " << static_cast<int>(e) << "\n";
 ```
 This will print:  
 RED: -12  

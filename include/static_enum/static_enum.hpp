@@ -52,7 +52,7 @@ namespace static_enum
 #define STATIC_ENUM_FUNCSIG __FUNCSIG__
 #else
 #define STATIC_ENUM_FUNCSIG
-		// Unsupported compiler.
+#error Unsupported compiler
 #endif
 		[[nodiscard]] constexpr bool is_digit(char c) noexcept
 		{
@@ -60,9 +60,9 @@ namespace static_enum
 		}
 		//this is the most simple version of the hack that we're gonna use
 		//we use either __PRETTY_FUNCTION__ or __FUNCSIG__ to analyze the function signature
-		//if the enum value doesn't exist it will appear as starting with "0x"
+		//if the enum value doesn't exist it will appear as a number
 		//otherwise it will have the correct enum name for the value V
-		//to check whether the enum is valid it's enough to check simply if the first letter of the enum is a 0
+		//to check whether the enum is valid it's enough to check simply if the first letter of the enum is a number
 		//this works with MSVC, gcc and clang
 		template <typename E, E V>
 		[[nodiscard]] constexpr bool is_valid_enum_impl() noexcept
@@ -162,7 +162,7 @@ namespace static_enum
 
 	//from_string(name): get the enum variable from a string, returns a constexpr std::optional<Enum>
 	template <typename E, typename U = std::underlying_type_t<std::decay_t<E>>, typename Indices = std::make_integer_sequence<int, detail::Limit<U>::Size>>
-	[[nodiscard]] constexpr std::optional<E> enum_from_string(std::string_view name) noexcept
+	[[nodiscard]] constexpr std::optional<E> from_string(std::string_view name) noexcept
 	{
 		static_assert(std::is_enum_v<std::decay_t<E>>, "static_enum::to_string requires an enum type.");
 		return detail::enum_from_string_impl<E, detail::Limit<U>::Offset>(name, Indices{});

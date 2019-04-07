@@ -23,16 +23,21 @@
 //
 #include <static_enum/static_enum.hpp>
 #include <iostream>
+#include <algorithm>
 
 enum class Color : int { GREEN = 7, RED = -12, BLUE = 15 };
 
-int main() 
+
+int main()
 {
-	
+	constexpr std::array<Color, 3> colorEnumerators = static_enum::get_enumerators<Color>();
+	//check the size of the array to get the number of different values
+	static_assert(colorEnumerators.size() == 3); 
 
-	constexpr auto colorEnumerators = static_enum::get_enumerators<Color>();
-	static_assert(colorEnumerators.size() == 3);
+	constexpr std::array<std::string_view, 3> colorEnumeratorNames = {"RED", "GREEN", "BLUE"};
+	std::array<Color, 3> colorsFromNames;
+	std::transform(colorEnumeratorNames.begin(), colorEnumeratorNames.end(), colorsFromNames.begin(), [](auto& val) { return *static_enum::from_string<Color>(val); });
 
-	for (auto e : colorEnumerators)
+	for (Color e : colorEnumerators)
 		std::cout << static_enum::to_string(e).value() << ": " << static_cast<int>(e) << "\n";
 }
