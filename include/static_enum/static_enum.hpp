@@ -45,10 +45,10 @@ namespace static_enum
 	namespace detail
 	{
 #if defined(__clang__) || (defined(__GNUC__) && __GNUC__ >= 9)
-		constexpr auto suffix = sizeof("]") - 1;
+		inline constexpr auto suffix = sizeof("]") - 1;
 #define STATIC_ENUM_FUNCSIG __PRETTY_FUNCTION__
 #elif defined(_MSC_VER)
-		constexpr auto suffix = sizeof(">(void) noexcept") - 1;
+		inline constexpr auto suffix = sizeof(">(void) noexcept") - 1;
 #define STATIC_ENUM_FUNCSIG __FUNCSIG__
 #else
 #define STATIC_ENUM_FUNCSIG
