@@ -39,5 +39,5 @@ int main()
 	std::transform(colorEnumeratorNames.begin(), colorEnumeratorNames.end(), colorsFromNames.begin(), [](auto& val) { return *static_enum::from_string<Color>(val); });
 
 	for (Color e : colorEnumerators)
-		std::cout << static_enum::to_string(e).value() << ": " << static_cast<int>(e) << "\n";
+		std::cout << static_enum::enum_cast(e) << ": " << static_cast<int>(e) << "\n";
 }

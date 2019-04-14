@@ -58,22 +58,15 @@ namespace static_enum
 		{
 			return c >= '0' && c <= '9';
 		}
-		//this is the most simple version of the hack that we're gonna use
+		//this is the hack that we're gonna use
 		//we use either __PRETTY_FUNCTION__ or __FUNCSIG__ to analyze the function signature
 		//if the enum value doesn't exist it will appear as a number
 		//otherwise it will have the correct enum name for the value V
 		//to check whether the enum is valid it's enough to check simply if the first letter of the enum is a number
 		//this works with MSVC, gcc and clang
-		template <typename E, E V>
-		[[nodiscard]] constexpr bool is_valid_enum_impl() noexcept
-		{
-			constexpr std::string_view name{ STATIC_ENUM_FUNCSIG };
-			return !is_digit(name[name.find_last_of(", :)-", name.size() - suffix) + 1]);
-		}
-
 		//for the string conversion we simply have to extract the correct substring from the function signature
 		template <typename E, E V>
-		[[nodiscard]] constexpr std::optional<std::string_view> to_string_impl_static() noexcept
+		[[nodiscard]] constexpr std::string_view to_string_impl_static() noexcept
 		{
 			constexpr std::string_view name{ STATIC_ENUM_FUNCSIG };
 			constexpr std::size_t prefix = name.find_last_of(", :)-", name.size() - suffix) + 1;
@@ -81,7 +74,7 @@ namespace static_enum
 			if constexpr (!is_digit(name[prefix]))
 				return name.substr(prefix, name.size() - suffix - prefix);
 			else
-				return std::nullopt;
+				return {};
 		}
 
 		template <typename E, int Offset, int ...I>
@@ -93,7 +86,7 @@ namespace static_enum
 		}
 
 		template <typename E, int Offset, int ...I>
-		[[nodiscard]] constexpr std::optional<std::string_view> to_string_impl(E value, std::integer_sequence<int, I...>) noexcept
+		[[nodiscard]] constexpr std::string_view to_string_impl(E value, std::integer_sequence<int, I...>) noexcept
 		{
 			//we have to convert the runtime value to a compile time index
 			//this method uses an O(1) lookup via function pointers
@@ -107,7 +100,7 @@ namespace static_enum
 		{
 			constexpr size_t N = sizeof...(I);
 			//here we create an array of bool where each index indicates whether it belongs to a valid enum entry
-			constexpr std::array<bool, N> validIndices{ {is_valid_enum_impl<E, static_cast<E>(I - Offset)>()...} };
+			constexpr std::array<bool, N> validIndices{ {!to_string_impl_static<E, static_cast<E>(I - Offset)>().empty()...} };
 			//here we count the number of valid enum indices
 			constexpr size_t numValid = ((validIndices[I] ? 1 : 0) + ...);
 			//with this information we can build an array of only valid enum entries
@@ -132,21 +125,23 @@ namespace static_enum
 	} // namespace detail
 
 	//get_enumerators(): return a std::array<Enum,N> with all enumeration values (sorted by value)
-	template <typename E, typename U = std::underlying_type_t<std::decay_t<E>>, typename Indices = std::make_integer_sequence<int, detail::Limit<U>::Size>>
+	template <typename E, typename U = std::underlying_type_t<std::decay_t<E>>>
 	[[nodiscard]] constexpr decltype(auto) get_enumerators() noexcept
 	{
+		using Indices = std::make_integer_sequence<int, detail::Limit<U>::Size>;
 		static_assert(std::is_enum_v<std::decay_t<E>>, "static_enum::to_string requires an enum type.");
 		return detail::get_enumerators_impl<E, detail::Limit<U>::Offset>(Indices{});
 	}
 
-	//to_string(Enum): get the name from an enum variable, returns a constexpr std::optional<std::string_view>
-	template <typename E, typename U = std::underlying_type_t<std::decay_t<E>>, typename Indices = std::make_integer_sequence<int, detail::Limit<U>::Size>>
-	[[nodiscard]] constexpr std::optional<std::string_view> to_string(E value) noexcept
+	//to_string(Enum): get the name from an enum variable, returns a constexpr std::string_view
+	template <typename E, typename U = std::underlying_type_t<std::decay_t<E>>>
+	[[nodiscard]] constexpr std::string_view to_string(E value) noexcept
 	{
+		using Indices = std::make_integer_sequence<int, detail::Limit<U>::Size>;
 		static_assert(std::is_enum_v<std::decay_t<E>>, "static_enum::to_string requires enum type.");
 		if (static_cast<int>(value) >= STATIC_ENUM_RANGE || static_cast<int>(value) <= -STATIC_ENUM_RANGE)
 		{
-			return std::nullopt; // Enum variable out of MAGIC_ENUM_RANGE.
+			return {}; // Enum variable out of STATIC_ENUM_RANGE.
 		}
 		return detail::to_string_impl<std::decay_t<E>, detail::Limit<U>::Offset>(value, Indices{});
 	}
@@ -154,17 +149,39 @@ namespace static_enum
 	// to_string<Enum>(): get the name from an enum variable, prefer this over the to_string() version if possible, since
 	// this version is much lighter on the compile times and is not restricted to the size limitation
 	template <auto V>
-	[[nodiscard]] constexpr std::optional<std::string_view> to_string() noexcept
+	[[nodiscard]] constexpr std::string_view to_string() noexcept
 	{
 		static_assert(std::is_enum_v<std::decay_t<decltype(V)>>, "static_enum::to_string requires an enum type.");
 		return detail::to_string_impl_static<decltype(V), V>();
 	}
 
 	//from_string(name): get the enum variable from a string, returns a constexpr std::optional<Enum>
-	template <typename E, typename U = std::underlying_type_t<std::decay_t<E>>, typename Indices = std::make_integer_sequence<int, detail::Limit<U>::Size>>
+	template <typename E, typename U = std::underlying_type_t<std::decay_t<E>>>
 	[[nodiscard]] constexpr std::optional<E> from_string(std::string_view name) noexcept
 	{
+		using Indices = std::make_integer_sequence<int, detail::Limit<U>::Size>;
 		static_assert(std::is_enum_v<std::decay_t<E>>, "static_enum::to_string requires an enum type.");
 		return detail::enum_from_string_impl<E, detail::Limit<U>::Offset>(name, Indices{});
 	}
+
+	template <typename E>
+	[[nodiscard]] constexpr std::optional<E> enum_cast(std::string_view name) noexcept
+	{
+		return from_string<E>(name);
+	}
+
+	template <auto V>
+	[[nodiscard]] constexpr std::string_view enum_cast() noexcept
+	{
+		static_assert(std::is_enum_v<std::decay_t<decltype(V)>>, "static_enum::to_string requires an enum type.");
+		return detail::to_string_impl_static<decltype(V), V>();
+	}
+
+	//to_string(Enum): get the name from an enum variable, returns a constexpr std::string_view
+	template <typename E, typename U = std::underlying_type_t<std::decay_t<E>>>
+	[[nodiscard]] constexpr std::string_view enum_cast(E value) noexcept
+	{
+		return to_string<E>(value);
+	}
+
 } // namespace static_enum

@@ -42,7 +42,7 @@ TEST(static_enum, enum_range_constexpr)
 	static_assert(enumRangeAlphabet.size() == 26);
 
 	for (size_t i = 0; i < 26; ++i)
-		ASSERT_EQ(static_enum::to_string(enumRangeAlphabet[i]).value().front(), ('a' + i));
+		ASSERT_EQ(static_enum::to_string(enumRangeAlphabet[i]).front(), ('a' + i));
 	
 	constexpr auto enumRangeColor = static_enum::get_enumerators<Color>();
 	static_assert(enumRangeColor.size() == 3);
@@ -66,35 +66,35 @@ TEST(static_enum, enum_range_constexpr)
 
 TEST(static_enum, to_string_dynamic)
 {
-	ASSERT_TRUE(static_enum::to_string<Color>(Color::RED).value() == "RED");
-	ASSERT_TRUE(static_enum::to_string(Color::BLUE).value() == "BLUE");
-	ASSERT_TRUE(static_enum::to_string(Color::GREEN).value() == "GREEN");
-	ASSERT_FALSE(static_enum::to_string(static_cast<Color>(4)));
+	ASSERT_TRUE(static_enum::to_string<Color>(Color::RED) == "RED");
+	ASSERT_TRUE(static_enum::to_string(Color::BLUE) == "BLUE");
+	ASSERT_TRUE(static_enum::to_string(Color::GREEN) == "GREEN");
+	ASSERT_TRUE(static_enum::to_string(static_cast<Color>(4)).empty());
 
-	ASSERT_TRUE(static_enum::to_string(Numbers::one).value() == "one");
-	ASSERT_TRUE(static_enum::to_string(Numbers::two).value() == "two");
-	ASSERT_TRUE(static_enum::to_string(Numbers::three).value() == "three");
-	ASSERT_FALSE(static_enum::to_string(static_cast<Numbers>(4)));
+	ASSERT_TRUE(static_enum::to_string(Numbers::one) == "one");
+	ASSERT_TRUE(static_enum::to_string(Numbers::two) == "two");
+	ASSERT_TRUE(static_enum::to_string(Numbers::three) == "three");
+	ASSERT_TRUE(static_enum::to_string(static_cast<Numbers>(4)).empty());
 
 }
 
 TEST(static_enum, to_string_static)
 {
-	ASSERT_TRUE(static_enum::to_string<Color::RED>().value() == "RED");
-	ASSERT_TRUE(static_enum::to_string<Color::BLUE>().value() == "BLUE");
-	ASSERT_TRUE(static_enum::to_string<Color::GREEN>().value() == "GREEN");
-	ASSERT_FALSE(static_enum::to_string<static_cast<Color>(4)>());
+	ASSERT_TRUE(static_enum::to_string<Color::RED>() == "RED");
+	ASSERT_TRUE(static_enum::to_string<Color::BLUE>() == "BLUE");
+	ASSERT_TRUE(static_enum::to_string<Color::GREEN>() == "GREEN");
+	ASSERT_TRUE(static_enum::to_string<static_cast<Color>(4)>().empty());
 
-	ASSERT_TRUE(static_enum::to_string<Numbers::one>().value() == "one");
-	ASSERT_TRUE(static_enum::to_string<Numbers::two>().value() == "two");
-	ASSERT_TRUE(static_enum::to_string<Numbers::three>().value() == "three");
-	ASSERT_FALSE(static_enum::to_string<static_cast<Numbers>(4)>());
+	ASSERT_TRUE(static_enum::to_string<Numbers::one>() == "one");
+	ASSERT_TRUE(static_enum::to_string<Numbers::two>() == "two");
+	ASSERT_TRUE(static_enum::to_string<Numbers::three>() == "three");
+	ASSERT_TRUE(static_enum::to_string<static_cast<Numbers>(4)>().empty());
 
-	ASSERT_TRUE(static_enum::to_string<Directions::Left>().value() == "Left");
-	ASSERT_TRUE(static_enum::to_string<Directions::Right>().value() == "Right");
-	ASSERT_TRUE(static_enum::to_string<Directions::Up>().value() == "Up");
-	ASSERT_TRUE(static_enum::to_string<Directions::Down>().value() == "Down");
-	ASSERT_FALSE(static_enum::to_string<static_cast<Directions>(123)>());
+	ASSERT_TRUE(static_enum::to_string<Directions::Left>() == "Left");
+	ASSERT_TRUE(static_enum::to_string<Directions::Right>() == "Right");
+	ASSERT_TRUE(static_enum::to_string<Directions::Up>() == "Up");
+	ASSERT_TRUE(static_enum::to_string<Directions::Down>() == "Down");
+	ASSERT_TRUE(static_enum::to_string<static_cast<Directions>(123)>().empty());
 }
 
 TEST(static_enum, from_string)
@@ -119,4 +119,22 @@ TEST(static_enum, from_string)
   ASSERT_TRUE(static_enum::from_string<number>("two").value() == number::two);
   ASSERT_TRUE(static_enum::from_string<number>("two").value() == number::two);
   ASSERT_TRUE(!static_enum::from_string<number>("None").has_value());
+}
+
+TEST(static_enum, enum_cast)
+{
+	ASSERT_TRUE(static_enum::enum_cast<Color::RED>() == "RED");
+	ASSERT_TRUE(static_enum::enum_cast<Color::BLUE>() == "BLUE");
+	ASSERT_TRUE(static_enum::enum_cast<Color::GREEN>() == "GREEN");
+	ASSERT_TRUE(static_enum::enum_cast<static_cast<Color>(4)>().empty());
+
+	ASSERT_TRUE(static_enum::enum_cast(Color::RED) == "RED");
+	ASSERT_TRUE(static_enum::enum_cast(Color::BLUE) == "BLUE");
+	ASSERT_TRUE(static_enum::enum_cast(Color::GREEN) == "GREEN");
+	ASSERT_TRUE(static_enum::enum_cast(static_cast<Color>(4)).empty());
+
+	ASSERT_TRUE(static_enum::enum_cast<Color>("RED") == Color::RED);
+	ASSERT_TRUE(static_enum::enum_cast<Color>("BLUE") == Color::BLUE);
+	ASSERT_TRUE(static_enum::enum_cast<Color>("GREEN") == Color::GREEN);
+	ASSERT_TRUE(!static_enum::enum_cast<Color>("NotSoGreen"));
 }
