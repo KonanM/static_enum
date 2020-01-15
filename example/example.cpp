@@ -30,7 +30,7 @@ enum class Color : int { GREEN = 7, RED = -12, BLUE = 15 };
 
 int main()
 {
-	constexpr std::array<Color, 3> colorEnumerators = static_enum::get_enumerators<Color>();
+	constexpr auto colorEnumerators = static_enum::get_enumerators<Color>();
 	//check the size of the array to get the number of different values
 	static_assert(colorEnumerators.size() == 3); 
 

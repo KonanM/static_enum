@@ -1,25 +1,6 @@
 
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2019 Kinan Mahdi
-//
-// Permission is hereby  granted, free of charge, to any  person obtaining a copy
-// of this software and associated  documentation files (the "Software"), to deal
-// in the Software  without restriction, including without  limitation the rights
-// to  use, copy,  modify, merge,  publish, distribute,  sublicense, and/or  sell
-// copies  of  the Software,  and  to  permit persons  to  whom  the Software  is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
-//
-// THE SOFTWARE  IS PROVIDED "AS  IS", WITHOUT WARRANTY  OF ANY KIND,  EXPRESS OR
-// IMPLIED,  INCLUDING BUT  NOT  LIMITED TO  THE  WARRANTIES OF  MERCHANTABILITY,
-// FITNESS FOR  A PARTICULAR PURPOSE AND  NONINFRINGEMENT. IN NO EVENT  SHALL THE
-// AUTHORS  OR COPYRIGHT  HOLDERS  BE  LIABLE FOR  ANY  CLAIM,  DAMAGES OR  OTHER
-// LIABILITY, WHETHER IN AN ACTION OF  CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE  OR THE USE OR OTHER DEALINGS IN THE
-// SOFTWARE.
 
 #pragma once
 
@@ -29,6 +10,10 @@
 #include <string_view>
 #include <optional>
 #include <array>
+
+#ifdef __cpp_lib_experimental_source_location
+#include <experimental/source_location>
+#endif // __cpp_lib_experimental_source_location
 
 // Enum variable must be in range (-STATIC_ENUM_RANGE / 2, STATIC_ENUM_RANGE /2) for signed types
 // Enum variable must be in range (0, STATIC_ENUM_RANGE) for unsigned types
@@ -88,7 +73,7 @@ namespace static_enum
 		[[nodiscard]] constexpr std::optional<E> enum_from_string_impl(std::string_view name, std::integer_sequence<int, I...>) noexcept
 		{
 			std::optional<E> returnValue;
-			(((to_string_impl_static<E, static_cast<E>(I - Offset)>() == name) ? (returnValue = static_cast<E>(I - Offset), false) : true) && ...);
+			(void)(((to_string_impl_static<E, static_cast<E>(I - Offset)>() == name) ? (returnValue = static_cast<E>(I - Offset), false) : true) && ...);
 			return returnValue;
 		}
 
@@ -99,7 +84,7 @@ namespace static_enum
 			//this method uses an O(1) lookup via function pointers
 			using ToStringFunctionDecl = decltype(&to_string_impl_static<E, static_cast<E>(0)>);
 			constexpr std::array<ToStringFunctionDecl, sizeof...(I)> to_string_functions{ { to_string_impl_static<E, static_cast<E>(I - Offset)>... } };
-			return to_string_functions[Offset + static_cast<int>(value)]();
+			return to_string_functions[size_t(Offset + static_cast<int>(value))]();
 		}
 
 		template <typename E, int Offset, int ...I>
@@ -109,7 +94,7 @@ namespace static_enum
 			//here we create an array of bool where each index indicates whether it belongs to a valid enum entry
 			constexpr std::array<bool, N> validIndices{ {is_valid_enum_impl<E, static_cast<E>(I - Offset)>()...} };
 			//here we count the number of valid enum indices
-			constexpr size_t numValid = ((validIndices[I] ? 1 : 0) + ...);
+			constexpr int numValid = ((validIndices[I] ? 1 : 0) + ...);
 			//with this information we can build an array of only valid enum entries
 			std::array<E, numValid> enumArray{};
 			size_t enumIdx = 0;
@@ -124,7 +109,7 @@ namespace static_enum
 		template <typename U>
 		struct Limit final
 		{
-			static constexpr int Range = sizeof(U) <= 2 ? (int)std::numeric_limits<U>::max() - (int)std::numeric_limits<U>::min() + 1 : std::numeric_limits<int>::max();
+			static constexpr int Range = sizeof(U) <= 2 ? static_cast<int>(std::numeric_limits<U>::max()) - static_cast<int>(std::numeric_limits<U>::min()) + 1 : std::numeric_limits<int>::max();
 			static constexpr int Size = std::min(Range, STATIC_ENUM_RANGE);
 			static constexpr int Offset = std::is_signed_v<U> ? (Size + 1) / 2 : 0;
 		};
@@ -132,17 +117,19 @@ namespace static_enum
 	} // namespace detail
 
 	//get_enumerators(): return a std::array<Enum,N> with all enumeration values (sorted by value)
-	template <typename E, typename U = std::underlying_type_t<std::decay_t<E>>, typename Indices = std::make_integer_sequence<int, detail::Limit<U>::Size>>
+	template <typename E, typename U = std::underlying_type_t<std::decay_t<E>>>
 	[[nodiscard]] constexpr decltype(auto) get_enumerators() noexcept
 	{
+		using Indices = std::make_integer_sequence<int, detail::Limit<U>::Size>;
 		static_assert(std::is_enum_v<std::decay_t<E>>, "static_enum::to_string requires an enum type.");
 		return detail::get_enumerators_impl<E, detail::Limit<U>::Offset>(Indices{});
 	}
 
 	//to_string(Enum): get the name from an enum variable, returns a constexpr std::optional<std::string_view>
-	template <typename E, typename U = std::underlying_type_t<std::decay_t<E>>, typename Indices = std::make_integer_sequence<int, detail::Limit<U>::Size>>
+	template <typename E, typename U = std::underlying_type_t<std::decay_t<E>>>
 	[[nodiscard]] constexpr std::optional<std::string_view> to_string(E value) noexcept
 	{
+		using Indices = std::make_integer_sequence<int, detail::Limit<U>::Size>;
 		static_assert(std::is_enum_v<std::decay_t<E>>, "static_enum::to_string requires enum type.");
 		if (static_cast<int>(value) >= STATIC_ENUM_RANGE || static_cast<int>(value) <= -STATIC_ENUM_RANGE)
 		{
@@ -161,9 +148,10 @@ namespace static_enum
 	}
 
 	//from_string(name): get the enum variable from a string, returns a constexpr std::optional<Enum>
-	template <typename E, typename U = std::underlying_type_t<std::decay_t<E>>, typename Indices = std::make_integer_sequence<int, detail::Limit<U>::Size>>
+	template <typename E, typename U = std::underlying_type_t<std::decay_t<E>>>
 	[[nodiscard]] constexpr std::optional<E> from_string(std::string_view name) noexcept
 	{
+		using Indices = std::make_integer_sequence<int, detail::Limit<U>::Size>;
 		static_assert(std::is_enum_v<std::decay_t<E>>, "static_enum::to_string requires an enum type.");
 		return detail::enum_from_string_impl<E, detail::Limit<U>::Offset>(name, Indices{});
 	}
