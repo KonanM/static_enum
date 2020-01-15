@@ -3,10 +3,13 @@
 ## What is Static Enum?
 
 Static Enum is a single header C++17 library which provides compile time enumumeration information without using any macros or having to define the enum with some macro magic.
+As far as I'm aware this was the first library to implement a get_enumerator implementation._
 
+* `static_enum::get_enumerators` creates a `std::array<Enum,N>` with all enumeration values (sorted by value)
+* `static_enum::enum_cast` can be used like static_cast to either convert an enum to a string, or from to create an string from an enum
 * `static_enum::to_string` get the name from an enum variable, returns a `constexpr std::optional<std::string_view>`
 * `static_enum::from_string` get the enum variable from a string, returns a `constexpr std::optional<Enum>`
-* `static_enum::get_enumerators` creates a `std::array<Enum,N>` with all enumeration values (sorted by value)
+
 
 ## Where is the drawback?
 Static Enum uses compiler intrinsics - namely `__PRETTY_FUNCTION__` and `__FUNCSIG__` to check whether an enumeration value is valid and make the string conversions. I have  taken this trick from https://github.com/Neargye/magic_enum and adapted it slightly.  
@@ -36,8 +39,9 @@ std::array<Color, 3> colorsFromNames;
 std::transform(colorEnumeratorNames.begin(), colorEnumeratorNames.end(), colorsFromNames.begin(), [](auto& val) { return *static_enum::from_string<Color>(val); });
 //or convert an enum to a name
 for (Color e : colorEnumerators)
-	std::cout << static_enum::to_string(e).value() << ": " << static_cast<int>(e) << "\n";
+	std::cout << static_enum::enum_cast(e) << ": " << static_cast<int>(e) << "\n";
 ```
+
 This will print:  
 RED: -12  
 GREEN: 7  
